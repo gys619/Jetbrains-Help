@@ -33,39 +33,24 @@ $(document).ready(function() {
 
     // Function to show VM options
     window.showVmoptions = function() {
-        // Copy the VM options to clipboard
-        const vmOptions = `-javaagent:/(Your Path)/ja-netfilter/ja-netfilter.jar
---add-opens=java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED
---add-opens=java.base/jdk.internal.org.objectweb.asm.tree=ALL-UNNAMED`;
-        
-        copyText(vmOptions).then(function() {
-            console.log('VM options copied to clipboard');
-        }).catch(function(err) {
-            console.error('Could not copy VM options: ', err);
-        });
-        
-        // Show the modal
-        document.getElementById('mask').style.display = 'block';
         document.getElementById('vmOptionsModal').style.display = 'block';
+        document.getElementById('mask').style.display = 'block';
+        // 初始化路径输入框为空
+        document.getElementById('jaNetfilterPath').value = '';
+        // 初始化VM Options文本
+        updateVmOptionsText();
     };
     
     window.closeVmOptionsModal = function() {
-        document.getElementById('mask').style.display = 'none';
         document.getElementById('vmOptionsModal').style.display = 'none';
+        document.getElementById('mask').style.display = 'none';
     };
     
     window.copyVmOptions = function() {
         const vmOptionsText = document.getElementById('vmOptionsText');
         vmOptionsText.select();
         document.execCommand('copy');
-        
-        // Show feedback
-        const button = document.querySelector('#vmOptionsModal button');
-        const originalText = button.textContent;
-        button.textContent = '已复制!';
-        setTimeout(() => {
-            button.textContent = originalText;
-        }, 2000);
+        alert('VM Options 已复制到剪贴板');
     };
 
     // Function to copy license
@@ -119,18 +104,31 @@ $(document).ready(function() {
         }
     };
 
-    // 添加到现有的 JavaScript 文件中
+    // 更新VM Options文本框中的路径
+    function updateVmOptionsText() {
+        const path = document.getElementById('jaNetfilterPath').value.trim();
+        let vmOptionsContent = `-javaagent:${path}/ja-netfilter.jar
+--add-opens=java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED
+--add-opens=java.base/jdk.internal.org.objectweb.asm.tree=ALL-UNNAMED`;
+        
+        document.getElementById('vmOptionsText').value = vmOptionsContent;
+    }
+
+    // 确保函数在全局范围内可用
+    window.updateVmOptionsText = updateVmOptionsText;
+
+    // 切换显示/隐藏教程内容
     window.toggleInstructions = function() {
-        const content = document.getElementById('instructionsContent');
+        const instructionsContent = document.getElementById('instructionsContent');
         const toggleText = document.getElementById('instructionsToggleText');
         const toggleIcon = document.getElementById('toggleIcon');
         
-        if (content.style.display === 'none') {
-            content.style.display = 'block';
+        if (instructionsContent.style.display === 'none') {
+            instructionsContent.style.display = 'block';
             toggleText.textContent = '隐藏配置教程';
             toggleIcon.textContent = '▲';
         } else {
-            content.style.display = 'none';
+            instructionsContent.style.display = 'none';
             toggleText.textContent = '显示配置教程';
             toggleIcon.textContent = '▼';
         }
