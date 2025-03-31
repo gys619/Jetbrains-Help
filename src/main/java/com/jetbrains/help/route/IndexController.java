@@ -11,8 +11,10 @@ import com.jetbrains.help.context.ProductsContextHolder;
 import com.jetbrains.help.properties.JetbrainsHelpProperties;
 import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
 
 import static org.springframework.http.HttpHeaders.CONTENT_DISPOSITION;
@@ -69,5 +72,21 @@ public class IndexController {
                 .header(CONTENT_DISPOSITION, "attachment;filename=" + jaNetfilterZipFile.getName())
                 .contentType(APPLICATION_OCTET_STREAM)
                 .body(new InputStreamResource(FileUtil.getInputStream(jaNetfilterZipFile)));
+    }
+
+    @GetMapping("/ja-netfilter-script")
+    public ResponseEntity<Resource> downloadJaNetfilterScript() throws IOException {
+        // 获取文件路径
+        Resource resource = new ClassPathResource("external/agent/ja-netfilter-script.zip");
+
+        // 设置响应头
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=ja-netfilter-script.zip");
+        headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE);
+
+        // 返回文件
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(resource);
     }
 }
