@@ -7,12 +7,139 @@
     <title>Jetbrains-Help</title>
     <link rel="stylesheet" type="text/css" href="/css/index.css">
     <link rel="icon" href="https://www.jetbrains.com/favicon.ico?r=1234">
+    <style>
+        .collapsible-button {
+            background-color: #f1f1f1;
+            color: #444;
+            cursor: pointer;
+            padding: 12px;
+            width: 100%;
+            border: none;
+            text-align: left;
+            outline: none;
+            font-size: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .collapsible-button:hover {
+            background-color: #ddd;
+        }
+
+        #vmOptionsModal {
+            width: 70%;
+            left: 15%;
+            max-height: 90vh;
+            top: 5%;
+            background-color: #1e1e2e;
+            border-radius: 10px;
+            padding: 20px;
+            color: white;
+        }
+
+        #vmOptionsModal .form {
+            max-width: 100%;
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #instructionsContent {
+            background-color: #f9f9f9;
+            color: #333;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 10px;
+            margin-bottom: 20px;
+            max-height: 60vh;
+            overflow-y: auto;
+            line-height: 1.6;
+            font-size: 15px;
+        }
+        
+        #instructionsContent h3 {
+            margin-top: 20px;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        
+        #instructionsContent ol, #instructionsContent ul {
+            margin-bottom: 20px;
+        }
+        
+        #instructionsContent li {
+            margin-bottom: 8px;
+        }
+        
+        #instructionsContent pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            overflow-x: auto;
+            font-family: monospace;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        #instructionsContent a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        
+        #instructionsContent a:hover {
+            text-decoration: underline;
+        }
+        
+        #vmOptionsText {
+            height: 120px !important;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        
+        .input-container {
+            width: 100%;
+            margin-bottom: 30px;
+        }
+        
+        .vm-options-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+        
+        .vm-options-buttons button {
+            width: 48%;
+        }
+        
+        .modal-footer {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        @media (max-width: 768px) {
+            #vmOptionsModal {
+                width: 95%;
+                left: 2.5%;
+                top: 2%;
+                max-height: 96vh;
+            }
+            
+            #instructionsContent {
+                max-height: 70vh;
+            }
+        }
+    </style>
 </head>
 <body>
 <header class="tip sticky flex items-center py-6">
     <p>
         🇨🇳 下载 <a href="ja-netfilter" title="Download jetbra first">ja-netfilter.zip</a> , 然后配置
-        你的JetBrains IDE(anything)'s <a onclick="showVmoptins()">IDE.vmoptions</a> 配置文件!<br>
+        你的JetBrains IDE(anything)'s <a onclick="showVmoptions()">IDE.vmoptions</a> 配置文件!<br>
         🇨🇳 当然你也可以 <a onclick="showLicenseForm()">重新定制激活授权</a> 用以自定义你的激活信息!</br>
         <strong>🇨🇳 请注意,此页面仅由 <span
                 th:text="${defaults.getDefaultLicenseName()} + '/' + ${defaults.getDefaultAssigneeName()}"></span>
@@ -98,6 +225,70 @@
             <label for="expiryDate" class="placeholder">过期时间</label>
         </div>
         <button class="submit" onclick="submitLicenseInfo(this)">确认</button>
+    </div>
+</div>
+
+<!-- 替换整个 VM Options Modal -->
+<div id="vmOptionsModal" style="position:fixed; top:5%; left:15%; width:70%; height:auto; max-height:90%; z-index:999; display:none; background-color:#1e1e2e; color:white; border-radius:10px; padding:30px; overflow-y:auto;">
+    <h2 style="margin-top:0; font-size:24px; text-align:center;">IDE.vmoptions 配置</h2>
+    <p style="margin-bottom:20px; text-align:center;">请添加以下配置到你的IDE.vmoptions文件</p>
+    
+    <div style="background-color:#2d2d3a; padding:15px; border-radius:5px; margin-bottom:20px;">
+        <textarea id="vmOptionsText" style="width:100%; height:120px; background-color:#2d2d3a; color:white; border:none; font-family:monospace; resize:none; padding:5px;" readonly>-javaagent:/(Your Path)/ja-netfilter/ja-netfilter.jar
+--add-opens=java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED
+--add-opens=java.base/jdk.internal.org.objectweb.asm.tree=ALL-UNNAMED</textarea>
+    </div>
+    
+    <div style="display:flex; justify-content:space-between; margin-bottom:30px;">
+        <button onclick="copyVmOptions()" style="width:48%; padding:12px; background-color:#3498db; color:white; border:none; border-radius:5px; cursor:pointer; font-size:16px;">复制配置</button>
+        <button onclick="closeVmOptionsModal()" style="width:48%; padding:12px; background-color:#e74c3c; color:white; border:none; border-radius:5px; cursor:pointer; font-size:16px;">关闭</button>
+    </div>
+    
+    <div style="margin-bottom:20px;">
+        <button id="instructionsToggleBtn" onclick="toggleInstructions()" style="width:100%; padding:12px; background-color:#2c3e50; color:white; border:none; border-radius:5px; cursor:pointer; font-size:16px; display:flex; justify-content:space-between; align-items:center;">
+            <span id="instructionsToggleText">显示配置教程</span> <span id="toggleIcon">▼</span>
+        </button>
+    </div>
+    
+    <div id="instructionsContent" style="display:none; background-color:white; color:#333; border-radius:5px; padding:20px; margin-top:10px; height:auto; max-height:400px; overflow-y:auto;">
+        <h3 style="color:#2c3e50; margin-top:0;">可打开IDE的情况：</h3>
+        <ol style="padding-left:20px; margin-bottom:20px;">
+            <li style="margin-bottom:8px;">进入IDE</li>
+            <li style="margin-bottom:8px;">点击 菜单栏 帮助（Help）</li>
+            <li style="margin-bottom:8px;">点击 编辑自定义虚拟机选项</li>
+            <li style="margin-bottom:8px;">键入 如下配置：</li>
+            <pre style="background:#f5f5f5; padding:15px; border-radius:5px; margin:15px 0; overflow-x:auto; font-family:monospace;">-javaagent:you-path/ja-netfilter.jar
+--add-opens=java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED
+--add-opens=java.base/jdk.internal.org.objectweb.asm.tree=ALL-UNNAMED</pre>
+            <li style="margin-bottom:8px;">将you-path替换为下载依赖步骤中自定义目录</li>
+            <li style="margin-bottom:8px;">重启 IDE</li>
+        </ol>
+        
+        <h3 style="color:#2c3e50; margin-top:20px;">不可打开IDE的情况：</h3>
+        <ol style="padding-left:20px; margin-bottom:20px;">
+            <li style="margin-bottom:8px;">下载安装 Toolbox：<a href="https://www.jetbrains.com/toolbox-app/" target="_blank" style="color:#3498db; text-decoration:none;">https://www.jetbrains.com/toolbox-app/</a></li>
+            <li style="margin-bottom:8px;">启动 Toolbox</li>
+            <li style="margin-bottom:8px;">点击 Toolbox 找到对应 IDE</li>
+            <li style="margin-bottom:8px;">点击 IDE 右侧的 ⋮</li>
+            <li style="margin-bottom:8px;">点击 设置</li>
+            <li style="margin-bottom:8px;">找到 配置 选项</li>
+            <li style="margin-bottom:8px;">点击 编辑JVM选项</li>
+            <li style="margin-bottom:8px;">键入 如下配置：</li>
+            <pre style="background:#f5f5f5; padding:15px; border-radius:5px; margin:15px 0; overflow-x:auto; font-family:monospace;">-javaagent:you-path/ja-netfilter.jar
+--add-opens=java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED
+--add-opens=java.base/jdk.internal.org.objectweb.asm.tree=ALL-UNNAMED</pre>
+            <li style="margin-bottom:8px;">将you-path替换为下载依赖步骤中自定义目录</li>
+            <li style="margin-bottom:8px;">重启 IDE</li>
+        </ol>
+        
+        <h3 style="color:#2c3e50; margin-top:20px;">注意事项：</h3>
+        <ul style="padding-left:20px;">
+            <li style="margin-bottom:8px;">之前的激活是否是用脚本激活，比如install.bat/sh等，此类需要先进行uninstall</li>
+            <li style="margin-bottom:8px;">当前的ja-netfilter/conf/power.conf中是否有自动生成配置</li>
+            <li style="margin-bottom:8px;">配置的vmoptions是否是IDE真实映射的vmoptions</li>
+            <li style="margin-bottom:8px;">如果能正常打开IDE，则可以通过帮助->自定义虚拟机选项编辑</li>
+            <li style="margin-bottom:8px;">如果不能正常打开IDE，建议下载Jetbrains's Toolbox，Toolbox针对IDE的设置项中可以进行编辑</li>
+        </ul>
     </div>
 </div>
 </body>

@@ -32,14 +32,40 @@ $(document).ready(function() {
     };
 
     // Function to show VM options
-    window.showVmoptins = function () {
-        var text = "-javaagent:/(Your Path)/ja-netfilter/ja-netfilter.jar\n" +
-        "--add-opens=java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED\n" +
-        "--add-opens=java.base/jdk.internal.org.objectweb.asm.tree=ALL-UNNAMED";
-        copyText(text)
-            .then((result) => {
-                alert(result);
-            });
+    window.showVmoptions = function() {
+        // Copy the VM options to clipboard
+        const vmOptions = `-javaagent:/(Your Path)/ja-netfilter/ja-netfilter.jar
+--add-opens=java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED
+--add-opens=java.base/jdk.internal.org.objectweb.asm.tree=ALL-UNNAMED`;
+        
+        copyText(vmOptions).then(function() {
+            console.log('VM options copied to clipboard');
+        }).catch(function(err) {
+            console.error('Could not copy VM options: ', err);
+        });
+        
+        // Show the modal
+        document.getElementById('mask').style.display = 'block';
+        document.getElementById('vmOptionsModal').style.display = 'block';
+    };
+    
+    window.closeVmOptionsModal = function() {
+        document.getElementById('mask').style.display = 'none';
+        document.getElementById('vmOptionsModal').style.display = 'none';
+    };
+    
+    window.copyVmOptions = function() {
+        const vmOptionsText = document.getElementById('vmOptionsText');
+        vmOptionsText.select();
+        document.execCommand('copy');
+        
+        // Show feedback
+        const button = document.querySelector('#vmOptionsModal button');
+        const originalText = button.textContent;
+        button.textContent = '已复制!';
+        setTimeout(() => {
+            button.textContent = originalText;
+        }, 2000);
     };
 
     // Function to copy license
@@ -68,7 +94,7 @@ $(document).ready(function() {
             });
     };
 
-// Function to copy text to clipboard
+    // Function to copy text to clipboard
     const copyText = async (val) => {
         if (navigator.clipboard && navigator.permissions) {
             return navigator.clipboard.writeText(val);
@@ -93,4 +119,20 @@ $(document).ready(function() {
         }
     };
 
+    // 添加到现有的 JavaScript 文件中
+    window.toggleInstructions = function() {
+        const content = document.getElementById('instructionsContent');
+        const toggleText = document.getElementById('instructionsToggleText');
+        const toggleIcon = document.getElementById('toggleIcon');
+        
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            toggleText.textContent = '隐藏配置教程';
+            toggleIcon.textContent = '▲';
+        } else {
+            content.style.display = 'none';
+            toggleText.textContent = '显示配置教程';
+            toggleIcon.textContent = '▼';
+        }
+    };
 });
