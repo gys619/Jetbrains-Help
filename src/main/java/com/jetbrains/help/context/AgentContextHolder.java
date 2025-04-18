@@ -26,7 +26,7 @@ public class AgentContextHolder {
 
     private static final String JA_NETFILTER_FILE_PATH = "external/agent/ja-netfilter";
 
-    private static final String POWER_CONF_FILE_NAME = JA_NETFILTER_FILE_PATH + "/config/power.conf";
+    private static final String POWER_CONF_FILE_NAME = JA_NETFILTER_FILE_PATH + "/config-jetbrains/power.conf";
 
     private static File jaNetfilterFile;
 
@@ -34,17 +34,50 @@ public class AgentContextHolder {
 
     public static void init() {
         log.info("初始化中...");
+        // 确保zip文件存在
         jaNetfilterZipFile = FileTools.getFileOrCreat(JA_NETFILTER_FILE_PATH + ".zip");
+        
+        // 确保目录结构存在
+        ensureDirectoryStructure();
+        
         if (!FileTools.fileExists(JA_NETFILTER_FILE_PATH)) {
-            unzipJaNetfilter();
-            if (!powerConfHasInit()) {
-                log.info("配置初始化中...");
-                loadPowerConf();
-                zipJaNetfilter();
-                log.info("配置初始化成功!");
+            try {
+                unzipJaNetfilter();
+                log.info("解压ja-netfilter成功");
+            } catch (Exception e) {
+                log.error("解压ja-netfilter失败", e);
+                // 创建必要的目录结构
+                createDirectoryStructure();
             }
         }
+        
+        if (!powerConfHasInit()) {
+            log.info("配置初始化中...");
+            loadPowerConf();
+            zipJaNetfilter();
+            log.info("配置初始化成功!");
+        }
+        
         log.info("初始化成功!");
+    }
+
+    private static void ensureDirectoryStructure() {
+        // 确保主目录存在
+        File mainDir = new File(JA_NETFILTER_FILE_PATH);
+        if (!mainDir.exists()) {
+            mainDir.mkdirs();
+        }
+        
+        // 确保config目录存在
+        File configDir = new File(JA_NETFILTER_FILE_PATH + "/config-jetbrains");
+        if (!configDir.exists()) {
+            configDir.mkdirs();
+        }
+    }
+    
+    private static void createDirectoryStructure() {
+        ensureDirectoryStructure();
+        // 这里可以添加创建其他必要文件的逻辑
     }
 
     public static File jaNetfilterZipFile() {
@@ -53,24 +86,70 @@ public class AgentContextHolder {
 
     private static boolean powerConfHasInit() {
         File powerConfFile = FileTools.getFileOrCreat(POWER_CONF_FILE_NAME);
+        
+        // 先检查文件是否存在并且有内容
+        if (!powerConfFile.exists() || powerConfFile.length() == 0) {
+            log.warn("power.conf文件不存在或为空，将尝试创建默认配置");
+            try {
+                // 创建一个默认的配置
+                return false; // 返回false以触发loadPowerConf()
+            } catch (Exception e) {
+                log.error("创建默认配置文件失败", e);
+                return false;
+            }
+        }
+        
         String powerConfStr;
         try {
             powerConfStr = IoUtil.readUtf8(FileUtil.getInputStream(powerConfFile));
         } catch (IORuntimeException e) {
-            throw new IllegalArgumentException(CharSequenceUtil.format("{} 文件读取失败!", POWER_CONF_FILE_NAME), e);
+            log.error("power.conf文件读取失败，将尝试重新创建", e);
+            return false; // 返回false以触发loadPowerConf()
         }
+        log.info("写入power.conf");
         return CharSequenceUtil.containsAll(powerConfStr, "[Result]", "EQUAL,");
     }
 
     private static void loadPowerConf() {
-        CompletableFuture
-                .supplyAsync(AgentContextHolder::generatePowerConfigRule)
-                .thenApply(AgentContextHolder::generatePowerConfigStr)
-                .thenAccept(AgentContextHolder::overridePowerConfFileContent)
-                .exceptionally(throwable -> {
-                    log.error("配置初始化失败!", throwable);
-                    return null;
-                }).join();
+        int retryCount = 0;
+        int maxRetries = 3;
+        boolean success = false;
+        
+        while (!success && retryCount < maxRetries) {
+            try {
+                int finalRetryCount = retryCount;
+                CompletableFuture
+                    .supplyAsync(AgentContextHolder::generatePowerConfigRule)
+                    .thenApply(AgentContextHolder::generatePowerConfigStr)
+                    .thenAccept(AgentContextHolder::overridePowerConfFileContent)
+                    .exceptionally(throwable -> {
+                        log.error("配置初始化失败! 尝试次数: {}", finalRetryCount + 1, throwable);
+                        return null;
+                    }).join();
+                
+                // 检查是否成功创建
+                File powerConfFile = new File(POWER_CONF_FILE_NAME);
+                if (powerConfFile.exists() && powerConfFile.length() > 0) {
+                    success = true;
+                }
+            } catch (Exception e) {
+                log.error("配置加载过程中发生错误，尝试次数: {}", retryCount + 1, e);
+            }
+            
+            retryCount++;
+            if (!success && retryCount < maxRetries) {
+                try {
+                    Thread.sleep(1000); // 等待1秒后重试
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        
+        if (!success) {
+            log.error("多次尝试初始化配置失败，请检查系统环境和文件权限");
+        }
     }
 
     @SneakyThrows
@@ -94,6 +173,7 @@ public class AgentContextHolder {
         try {
             FileUtil.writeString(configStr, powerConfFile, StandardCharsets.UTF_8);
         } catch (IORuntimeException e) {
+            log.error("power.conf文件写入失败", e);
             throw new IllegalArgumentException(CharSequenceUtil.format("{} 文件写入失败!", POWER_CONF_FILE_NAME), e);
         }
     }
