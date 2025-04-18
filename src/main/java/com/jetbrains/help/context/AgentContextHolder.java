@@ -18,6 +18,9 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPublicKey;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 @Slf4j(topic = "代理上下文")
@@ -27,6 +30,9 @@ public class AgentContextHolder {
     private static final String JA_NETFILTER_FILE_PATH = "external/agent/ja-netfilter";
 
     private static final String POWER_CONF_FILE_NAME = JA_NETFILTER_FILE_PATH + "/config-jetbrains/power.conf";
+    
+    // 可能的配置文件名
+    private static final String[] POSSIBLE_CONFIG_FILES = {"power.conf", "power.txt"};
 
     private static File jaNetfilterFile;
 
@@ -212,14 +218,11 @@ public class AgentContextHolder {
             return;
         }
         
+        log.info("开始搜索配置目录和文件，基础目录: {}", baseDir.getAbsolutePath());
+        
         // 首先尝试预期路径
         File expectedConfigDir = new File(baseDir, "config-jetbrains");
-        File expectedPowerConfFile = new File(expectedConfigDir, "power.conf");
-        
-        if (expectedConfigDir.exists() && expectedPowerConfFile.exists()) {
-            log.info("在预期路径找到配置: {}", expectedPowerConfFile.getAbsolutePath());
-            actualConfigDir = expectedConfigDir;
-            actualPowerConfFile = expectedPowerConfFile;
+        if (checkConfigDir(expectedConfigDir)) {
             return;
         }
         
@@ -227,31 +230,109 @@ public class AgentContextHolder {
         File nestedDir = new File(baseDir, "ja-netfilter");
         if (nestedDir.exists() && nestedDir.isDirectory()) {
             File nestedConfigDir = new File(nestedDir, "config-jetbrains");
-            File nestedPowerConfFile = new File(nestedConfigDir, "power.conf");
-            
-            if (nestedConfigDir.exists() && nestedPowerConfFile.exists()) {
-                log.info("在嵌套目录找到配置: {}", nestedPowerConfFile.getAbsolutePath());
-                actualConfigDir = nestedConfigDir;
-                actualPowerConfFile = nestedPowerConfFile;
+            if (checkConfigDir(nestedConfigDir)) {
                 return;
             }
         }
         
-        // 最后递归搜索config-jetbrains目录
-        File configDir = findDirectoryRecursively(baseDir, "config-jetbrains");
-        if (configDir != null) {
-            File powerConfFile = new File(configDir, "power.conf");
-            if (powerConfFile.exists()) {
-                log.info("通过递归搜索找到配置: {}", powerConfFile.getAbsolutePath());
-                actualConfigDir = configDir;
-                actualPowerConfFile = powerConfFile;
+        // 最后广泛搜索所有可能的配置目录
+        List<File> configDirs = findConfigDirectories(baseDir);
+        log.info("找到 {} 个可能的配置目录", configDirs.size());
+        
+        for (File configDir : configDirs) {
+            if (checkConfigDir(configDir)) {
+                log.info("从搜索结果中找到有效的配置目录: {}", configDir.getAbsolutePath());
                 return;
             }
         }
         
-        log.warn("未能找到config-jetbrains目录和power.conf文件");
+        log.warn("未能找到任何有效的配置目录和配置文件");
         actualConfigDir = null;
         actualPowerConfFile = null;
+    }
+    
+    /**
+     * 检查目录是否为有效的配置目录（包含power.conf文件）
+     * @return 如果是有效的配置目录则返回true
+     */
+    private static boolean checkConfigDir(File configDir) {
+        if (configDir != null && configDir.exists() && configDir.isDirectory()) {
+            log.info("检查可能的配置目录: {}", configDir.getAbsolutePath());
+            
+            // 检查所有可能的配置文件名
+            for (String configFileName : POSSIBLE_CONFIG_FILES) {
+                File configFile = new File(configDir, configFileName);
+                if (configFile.exists()) {
+                    log.info("找到有效的配置文件: {}", configFile.getAbsolutePath());
+                    actualConfigDir = configDir;
+                    actualPowerConfFile = configFile;
+                    return true;
+                }
+            }
+            
+            // 记录目录内容，帮助调试
+            log.info("配置目录存在但未找到配置文件，列出目录内容:");
+            logDirectoryContents(configDir);
+        }
+        return false;
+    }
+    
+    /**
+     * 查找所有可能的配置目录
+     * 包括config-jetbrains、config目录以及包含config的目录
+     */
+    private static List<File> findConfigDirectories(File baseDir) {
+        List<File> results = new ArrayList<>();
+        if (baseDir == null || !baseDir.exists() || !baseDir.isDirectory()) {
+            return results;
+        }
+        
+        // 使用辅助方法递归搜索所有可能的配置目录
+        findAllConfigDirs(baseDir, results);
+        
+        // 对结果按优先级排序：
+        // 1. 精确匹配"config-jetbrains"
+        // 2. 精确匹配"config"
+        // 3. 包含"config"的其他目录（按字母顺序）
+        results.sort(Comparator.<File>comparingInt(file -> {
+            String name = file.getName().toLowerCase();
+            if (name.equals("config-jetbrains")) return 0;
+            else if (name.equals("config")) return 1;
+            else return 2;
+        }).thenComparing(File::getName));
+        
+        // 打印找到的所有配置目录
+        if (!results.isEmpty()) {
+            log.info("找到的可能配置目录（按优先级排序）:");
+            for (int i = 0; i < results.size(); i++) {
+                log.info("{}. {}", i + 1, results.get(i).getAbsolutePath());
+            }
+        }
+        
+        return results;
+    }
+    
+    /**
+     * 递归查找所有可能的配置目录
+     */
+    private static void findAllConfigDirs(File dir, List<File> results) {
+        if (dir == null || !dir.exists() || !dir.isDirectory()) {
+            return;
+        }
+        
+        // 检查当前目录是否为可能的配置目录
+        String dirName = dir.getName().toLowerCase();
+        if (dirName.equals("config-jetbrains") || dirName.equals("config") || dirName.contains("config")) {
+            results.add(dir);
+        }
+        
+        // 递归检查子目录
+        File[] subDirs = dir.listFiles(File::isDirectory);
+        if (subDirs != null) {
+            for (File subDir : subDirs) {
+                findAllConfigDirs(subDir, results);
+            }
+        }
     }
     
     /**
